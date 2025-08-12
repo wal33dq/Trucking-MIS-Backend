@@ -87,6 +87,7 @@ export class TasksController {
       callTime: string;
       comments: string;
       dispatcherId: string;
+      truckType: string;
     },
   ) {
     const payloadWithDate = {

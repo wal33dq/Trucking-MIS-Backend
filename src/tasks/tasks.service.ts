@@ -15,12 +15,10 @@ export class TasksService {
 
   // Create bulk assignments from a CSV buffer
   async createMany(saleAgentId: string, buffer: Buffer): Promise<{ inserted: number }> {
-    // Validate the provided saleAgentId to ensure it's a valid MongoDB ObjectId
     if (!Types.ObjectId.isValid(saleAgentId)) {
       throw new BadRequestException(`Invalid saleAgentId format: "${saleAgentId}" is not a valid ObjectId.`);
     }
     
-    // FIX: Add a check to ensure the buffer exists and is not empty before processing.
     if (!buffer || buffer.length === 0) {
         throw new BadRequestException('The uploaded CSV file is empty or corrupted.');
     }
@@ -29,15 +27,12 @@ export class TasksService {
     const rows: Partial<Task>[] = [];
 
     await new Promise<void>((resolve, reject) => {
-      // Create a readable stream from the buffer
       const stream = Readable.from(buffer);
 
       stream
         .pipe(csv.parse({ headers: true, trim: true }))
         .on('error', (error) => reject(error))
         .on('data', (row: any) => {
-          // Map CSV row data to the Task schema.
-          // This handles different possible header names like 'MC Number' or 'mcNumber'.
           const taskData: Partial<Task> = {
             mcNumber: row['MC Number'] || row['mcNumber'],
             companyName: row['Company Name'] || row['companyName'],
@@ -45,7 +40,7 @@ export class TasksService {
             email: row['Email'] || row['email'],
             phone: row['Phone'] || row['phone'],
             saleAgent: agentObjectId,
-            status: 'assigned', // Set initial status
+            status: 'assigned',
           };
           rows.push(taskData);
         })
@@ -59,7 +54,6 @@ export class TasksService {
         throw new BadRequestException('CSV file is empty or does not contain valid data rows.');
     }
 
-    // Insert all the parsed tasks into the database in a single operation.
     const created = await this.taskModel.insertMany(rows);
     return { inserted: created.length };
   }
@@ -94,19 +88,17 @@ export class TasksService {
         throw new BadRequestException('Invalid ID format for task or dispatcher');
     }
 
-    // In a real-world app, you would upload to a cloud service (e.g., S3, Azure Blob Storage)
-    // and store the URLs. Here, we are storing the local file path.
     const documentUrls = files.map(file => file.path);
 
     const updated = await this.taskModel.findByIdAndUpdate(
       id,
       {
         ...payload,
-        documentUrls, // Add the array of document paths to the task
+        documentUrls,
         dispatcher: new Types.ObjectId(payload.dispatcherId),
-        status: 'submitted', // Update the task status
+        status: 'submitted',
       },
-      { new: true }, // Return the updated document
+      { new: true },
     );
     if (!updated) {
       throw new NotFoundException('Task not found for submission');
@@ -116,7 +108,11 @@ export class TasksService {
 
   // Dispatcher: list all submitted tasks
   async findSubmitted(): Promise<Task[]> {
-    return this.taskModel.find({ status: 'submitted' }).exec();
+    // FIX: Populate the 'saleAgent' field to also fetch the agent's details (like name).
+    return this.taskModel
+      .find({ status: 'submitted' })
+      .populate('saleAgent', 'name')
+      .exec();
   }
 
   // Dispatcher: finalize a task with invoice details
@@ -131,7 +127,7 @@ export class TasksService {
       id,
       {
         ...invoice,
-        status: 'invoiced', // Update status to 'invoiced'
+        status: 'invoiced',
       },
       { new: true },
     );

@@ -29,6 +29,9 @@ export class Task {
   @Prop()
   driverName?: string;
 
+  @Prop()
+  truckType?: string;
+
   // Replaced documentUrl with an array to store multiple document paths
   @Prop({ type: [String] })
   documentUrls?: string[];
